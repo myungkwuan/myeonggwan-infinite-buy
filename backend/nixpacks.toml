@@ -1,0 +1,6 @@
+# Railway Nixpacks 빌드 설정 (backend가 root directory)
+# python provider가 requirements.txt를 자동 설치하고, 시작 명령만 지정한다.
+providers = ["python"]
+
+[start]
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
