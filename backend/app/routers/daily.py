@@ -90,8 +90,14 @@ def calculate(payload: schemas.DailyCalcRequest, db: Session = Depends(get_db)):
     t = pos["turn_number"]
     base_price = avg if holding > 0 else price  # 첫날은 현재가 기준
 
+    seed_total_usd = float(s.per_turn_usd) * float(s.divisions)
+    remaining_seed_usd = max(0.0, seed_total_usd - pos["total_buy_cost_usd"])
+
     if base_price:
-        buy_orders = calc_buy_orders(base_price, t, s.per_turn_usd, rate)
+        buy_orders = calc_buy_orders(
+            base_price, t, s.per_turn_usd, rate,
+            budget_cap_usd=remaining_seed_usd,
+        )
     else:
         buy_orders = []
         warnings.append("기준가 없음 → 매수 계산 불가")
@@ -132,6 +138,8 @@ def calculate(payload: schemas.DailyCalcRequest, db: Session = Depends(get_db)):
         buy_orders=buy_orders, sell_orders=sell_orders,
         evaluation=schemas.EvaluationOut(**ev), warnings=warnings,
         seed_alert=_seed_alert(t, s.divisions),
+        remaining_seed_usd=round(remaining_seed_usd, 2),
+        remaining_turns=round(remaining_seed_usd / s.per_turn_usd, 2) if s.per_turn_usd else None,
     )
 
 
@@ -162,6 +170,13 @@ def today(db: Session = Depends(get_db)):
         ),
         warnings=[],
         seed_alert=_seed_alert(ds.turn_number, s.divisions),
+        remaining_seed_usd=round(
+            max(0.0, float(s.per_turn_usd) * float(s.divisions)
+                - compute_position(db, s)["total_buy_cost_usd"]), 2),
+        remaining_turns=round(
+            max(0.0, float(s.per_turn_usd) * float(s.divisions)
+                - compute_position(db, s)["total_buy_cost_usd"]) / s.per_turn_usd, 2)
+        if s.per_turn_usd else None,
     )
 
 

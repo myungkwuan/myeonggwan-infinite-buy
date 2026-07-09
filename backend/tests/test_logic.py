@@ -92,3 +92,26 @@ def test_evaluation_usd_krw():
     assert e["profit_pct"] == 20.0
     assert e["eval_value_krw"] == round(21600.0 * RATE)
     assert e["profit_krw"] == round(3600.0 * RATE)
+
+
+def test_buy_orders_budget_cap():
+    """마지막 회차: 남은 시드로 매수 예산 캡핑."""
+    per = 8136.75
+    # 후반전 T=39.5, 남은 시드 = 0.5회분
+    remaining = per * 0.5
+    orders = calc_buy_orders(100.0, 39.5, per, 1500.0, budget_cap_usd=remaining)
+    total = sum(o["quantity"] * o["price_usd"] for o in orders)
+    assert total <= remaining + 1e-6
+    assert all("남은 시드 한도" in o["note"] for o in orders)
+
+    # 전반전 캡핑: 총액이 캡 이하
+    orders2 = calc_buy_orders(100.0, 5.0, per, 1500.0, budget_cap_usd=per * 0.3)
+    total2 = sum(o["quantity"] * o["price_usd"] for o in orders2)
+    assert total2 <= per * 0.3 + 1e-6
+
+    # 시드 소진: 매수 없음
+    assert calc_buy_orders(100.0, 39.9, per, 1500.0, budget_cap_usd=0.0) == []
+
+    # cap=None 은 기존 동작 그대로 (회당 전액)
+    base = calc_buy_orders(100.0, 25.0, per, 1500.0)
+    assert sum(o["quantity"] * o["price_usd"] for o in base) <= per

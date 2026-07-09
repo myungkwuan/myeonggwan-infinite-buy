@@ -69,6 +69,8 @@ class DailyCalcOut(BaseModel):
     evaluation: EvaluationOut
     warnings: list[str] = []
     seed_alert: Optional[dict] = None
+    remaining_seed_usd: Optional[float] = None
+    remaining_turns: Optional[float] = None
 
 
 class FillIn(BaseModel):

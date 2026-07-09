@@ -74,14 +74,26 @@ def split_quantity(total_qty: float) -> tuple[int, int]:
     return quarter, total - quarter
 
 
-def calc_buy_orders(base_price, t, per_turn_usd, rate):
+def calc_buy_orders(base_price, t, per_turn_usd, rate, budget_cap_usd=None):
     """당일 매수 LOC 주문 목록.
 
     base_price: 평단가. 첫날(보유 0)에는 호출측이 현재 SOXL가를 넣는다.
+    budget_cap_usd: 남은 시드 한도. None이면 무제한(기존 동작),
+                    지정 시 당일 매수 예산 = min(회당액, 한도). 0 이하면 매수 없음.
     """
     orders = []
     if base_price is None or base_price <= 0:
         return orders
+
+    # 남은 시드 캡핑 (마지막 회차 시드 초과 방지)
+    budget = per_turn_usd
+    capped = False
+    if budget_cap_usd is not None:
+        if budget_cap_usd <= 0:
+            return orders  # 시드 소진 → 매수 없음
+        if budget_cap_usd < budget:
+            budget = budget_cap_usd
+            capped = True
 
     mode = calc_mode(t)
 
@@ -91,22 +103,25 @@ def calc_buy_orders(base_price, t, per_turn_usd, rate):
     if mode == "후반전":
         discount = 1.5 * t - 15.0  # %
         price = _round_price(base_price * (1 - discount / 100.0))
-        qty = _qty_for_budget(per_turn_usd, price)
+        qty = _qty_for_budget(budget, price)
         if qty > 0:
+            note = f"종가가 평단 -{discount:.2f}% 이하면 매수"
+            if capped:
+                note += " · 남은 시드 한도 적용"
             orders.append(_make_order(
-                "많이 빠지면 매수", "LOC", qty, price, rate,
-                note=f"종가가 평단 -{discount:.2f}% 이하면 매수",
+                "많이 빠지면 매수", "LOC", qty, price, rate, note=note,
             ))
         return orders
 
     # 전반전 (T <= 19): 회당 50% + 50%
-    half = per_turn_usd * 0.5
+    half = budget * 0.5
+    cap_note = " · 남은 시드 한도 적용" if capped else ""
     price1 = _round_price(base_price)
     qty1 = _qty_for_budget(half, price1)
     if qty1 > 0:
         orders.append(_make_order(
             "평단가에 매수", "LOC", qty1, price1, rate,
-            note="종가가 평단가 이하면 매수",
+            note="종가가 평단가 이하면 매수" + cap_note,
         ))
     premium = 10.0 - t / 2.0
     price2 = _round_price(base_price * (1 + premium / 100.0))
@@ -114,7 +129,7 @@ def calc_buy_orders(base_price, t, per_turn_usd, rate):
     if qty2 > 0:
         orders.append(_make_order(
             "조금 비싸도 매수", "LOC", qty2, price2, rate,
-            note=f"종가가 평단 +{premium:.2f}% 이하면 매수",
+            note=f"종가가 평단 +{premium:.2f}% 이하면 매수" + cap_note,
         ))
     return orders
 

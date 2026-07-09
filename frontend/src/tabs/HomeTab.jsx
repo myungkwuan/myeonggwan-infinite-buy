@@ -137,6 +137,18 @@ export default function HomeTab() {
         <span>회당 <span className="num">{usd(session.per_turn_usd)}</span></span>
       </div>
 
+      {daily.remaining_seed_usd != null && (
+        <div className="seed-left">
+          <span>남은 시드</span>
+          <span>
+            <b className="num">{daily.remaining_turns?.toFixed(1)}</b>회분
+            {' · '}
+            <span className="num">₩{Math.round(daily.remaining_seed_usd * daily.usd_krw_rate).toLocaleString('ko-KR')}</span>
+            <span className="seed-sub"> ({usd(daily.remaining_seed_usd)})</span>
+          </span>
+        </div>
+      )}
+
       <ManualCalc
         defaultRate={daily.usd_krw_rate}
         defaultPrice={daily.soxl_price}
